@@ -23,36 +23,231 @@
 
 作业提交方式为：**提交视频文件**和**仓库的链接**到指定邮箱。
 
+## ✨ 最新更新（重要）
+
+### 🎉 新增功能
+1. **👑 管理员身份标识**：管理员登录后显示金色徽章
+2. **📅 日期时间选择器**：创建项目时直接选择截止日期和时间（不再是持续秒数）
+3. **🎨 精美界面**：全新渐变设计、动画效果、玻璃态风格
+4. **🔒 权限控制**：只有管理员可以创建项目
+5. **✅ 问题修复**：解决了竞猜活动无法显示的问题
+
+### 📖 详细说明文档
+- [最新更新说明.md](./最新更新说明.md) - 查看所有改进详情
+- [管理员配置指南.md](./管理员配置指南.md) - 配置管理员账户
+- [使用说明文档.md](./使用说明文档.md) - 完整使用教程
+
+---
+
 ## 如何运行
 
-补充如何完整运行你的应用。
+### 前置要求
+- Node.js (v16+)
+- Ganache
+- MetaMask 浏览器插件
 
-1. 在本地启动ganache应用。
+### 详细步骤
 
-2. 在 `./contracts` 中安装需要的依赖，运行如下的命令：
-    ```bash
-    npm install
-    ```
-3. 在 `./contracts` 中编译合约，运行如下的命令：
-    ```bash
-    npx hardhat compile
-    ```
-4. ...
-5. ...
-6. 在 `./frontend` 中安装需要的依赖，运行如下的命令：
-    ```bash
-    npm install
-    ```
-7. 在 `./frontend` 中启动前端程序，运行如下的命令：
-    ```bash
-    npm run start
-    ```
+1. **启动 Ganache**
+   - 打开 Ganache 应用程序
+   - 创建新工作区或快速启动
+   - 确保 RPC 地址为 `http://127.0.0.1:8545`
+
+2. **安装合约依赖并部署**
+   
+   在 `./contracts` 目录中运行：
+   ```bash
+   npm install
+   ```
+
+3. **配置 Hardhat**
+   
+   编辑 `./contracts/hardhat.config.ts`，将 Ganache 账户私钥填入 `accounts` 数组
+
+4. **编译合约**
+   ```bash
+   npx hardhat compile
+   ```
+
+5. **部署合约到 Ganache**
+   ```bash
+   npx hardhat run scripts/deploy.ts --network ganache
+   ```
+
+6. **更新前端配置**
+   ```bash
+   node scripts/update-frontend-config.js
+   ```
+
+7. **安装前端依赖**
+   
+   在 `./frontend` 目录中运行：
+   ```bash
+   npm install
+   ```
+
+8. **启动前端应用**
+   ```bash
+   npm start
+   ```
+
+9. **配置 MetaMask**
+   - 添加 Ganache 网络（链 ID: 1337, RPC: http://127.0.0.1:8545）
+   - 导入 Ganache 账户私钥
+
+10. **开始使用**
+    - 访问 http://localhost:3000
+    - 连接 MetaMask 钱包
+    - 领取 BET 代币开始体验
+
+**详细使用说明请查看：** [使用说明文档.md](./使用说明文档.md)
 
 ## 功能实现分析
 
-简单描述：项目完成了要求的哪些功能？每个功能具体是如何实现的？
+本项目完整实现了所有要求功能以及 Bonus 功能：
 
-建议分点列出。
+### 1. 基础功能
+
+#### 1.1 公证人创建竞猜项目 ✅
+- **实现方式**: `BettingSystem.sol` 中的 `createProject()` 函数
+- **功能特点**:
+  - 支持自定义项目名称、描述和多个选项（2个或以上）
+  - 公证人需要提供基础奖金（从公证人账户转入合约）
+  - 设置项目截止时间
+  - 项目创建后处于"进行中"状态
+- **关键代码**: 使用 `mapping(uint256 => Project)` 存储项目信息
+
+#### 1.2 玩家购买彩票并获得 ERC721 凭证 ✅
+- **实现方式**: 
+  - `BettingSystem.sol` 中的 `purchaseTicket()` 函数
+  - `BetTicket.sol` ERC721 合约铸造唯一彩票 NFT
+- **功能特点**:
+  - 购买时支付 100 BET 代币，奖池金额增加
+  - 每张彩票是一个唯一的 NFT（ERC721 Token）
+  - 彩票记录项目 ID 和选项索引
+  - 支持查询用户拥有的所有彩票
+- **关键代码**: 
+  ```solidity
+  uint256 ticketId = betTicket.mintTicket(msg.sender, projectId, optionIndex);
+  project.totalPool += TICKET_PRICE;
+  ```
+
+#### 1.3 彩票交易功能 ✅
+- **实现方式**: 
+  - 卖方: `createSellOrder()` 创建出售订单
+  - 买方: `buyTicketFromOrder()` 购买订单中的彩票
+- **功能特点**:
+  - 卖家可以以任意价格挂单出售彩票
+  - 买家可以查看所有订单并购买
+  - 使用 ERC721 的 `approve` 和 `transferFrom` 机制
+  - 订单完成后自动失效
+- **关键代码**: 订单簿存储在 `mapping(uint256 => Order) public orders`
+
+#### 1.4 项目结算与奖励分配 ✅
+- **实现方式**: 
+  - `settleProject()` - 公证人设置获胜选项
+  - `claimReward()` - 获胜者领取奖励
+- **功能特点**:
+  - 只有创建者可以结算项目
+  - 所有持有获胜选项彩票的玩家可以平分奖池
+  - 彩票领取奖励后被销毁，防止重复领取
+  - 奖励计算: `奖池总额 / 获胜彩票数量`
+- **关键代码**:
+  ```solidity
+  uint256 rewardPerTicket = project.totalPool / winningTickets;
+  betToken.transfer(msg.sender, rewardPerTicket);
+  ```
+
+### 2. Bonus 功能
+
+#### 2.1 ERC20 积分系统 ✅ (2分)
+- **实现方式**: `BetToken.sol` ERC20 合约
+- **功能特点**:
+  - 用户可以免费领取 BET 代币（每次 1000 个）
+  - 每个地址最多领取 10 次
+  - 使用 BET 代币购买彩票和交易
+  - 标准 ERC20 功能（转账、授权等）
+- **关键代码**:
+  ```solidity
+  function claimTokens() external {
+      require(claimCount[msg.sender] < MAX_CLAIMS, "Maximum claims reached");
+      _mint(msg.sender, CLAIM_AMOUNT);
+  }
+  ```
+
+#### 2.2 链上订单簿系统 ✅ (3分)
+- **实现方式**: 完全去中心化的订单簿存储在区块链上
+- **功能特点**:
+  - 卖方可以以不同价格出售同一种彩票
+  - 前端显示订单簿信息（订单ID、彩票ID、价格、卖家）
+  - 买方可以查看所有订单并选择购买
+  - 支持取消订单功能
+  - 订单按项目分类存储
+- **关键代码**:
+  ```solidity
+  mapping(uint256 => Order) public orders;
+  mapping(uint256 => uint256[]) public projectOrders;
+  function getProjectOrders(uint256 projectId) external view returns (Order[] memory)
+  ```
+
+### 3. 智能合约架构
+
+#### 3.1 BetToken.sol (ERC20 代币)
+- 继承 OpenZeppelin 的 ERC20 和 Ownable
+- 实现免费领取机制
+- 总供应量灵活，按需铸造
+
+#### 3.2 BetTicket.sol (ERC721 NFT)
+- 继承 OpenZeppelin 的 ERC721 和 ERC721URIStorage
+- 每张彩票有唯一 ID 和关联的项目信息
+- 支持批量查询用户彩票
+
+#### 3.3 BettingSystem.sol (主系统合约)
+- 管理项目生命周期（创建、进行中、已结算）
+- 处理彩票购买和奖池管理
+- 实现去中心化订单簿
+- 处理结算和奖励分配
+- 使用 ReentrancyGuard 防止重入攻击
+
+### 4. 前端实现
+
+#### 4.1 技术栈
+- React + TypeScript
+- ethers.js v5 (Web3 交互)
+- 响应式 CSS 设计
+
+#### 4.2 核心功能
+- MetaMask 钱包连接（支持 Edge 等浏览器插件）
+- 账户切换自动更新
+- 实时余额显示
+- 四个主要功能模块：
+  1. 所有项目 - 浏览和购买
+  2. 创建项目 - 公证人创建竞猜
+  3. 我的彩票 - 管理和出售
+  4. 交易市场 - 订单簿查看和购买
+
+#### 4.3 用户体验优化
+- Loading 状态显示
+- 交易确认提示
+- 错误处理和友好提示
+- 美观的渐变色设计
+- 响应式布局适配移动端
+
+### 5. 安全特性
+
+1. **重入攻击防护**: 使用 OpenZeppelin 的 ReentrancyGuard
+2. **授权检查**: 所有代币/NFT 转移前检查授权
+3. **权限控制**: 只有创建者可以结算项目
+4. **防重复领取**: 彩票领取奖励后销毁
+5. **输入验证**: 所有函数参数都有严格验证
+
+### 6. 逻辑正确性
+
+- **奖池计算**: 基础奖金 + 所有购买金额
+- **公平分配**: 获胜者平分奖池，每张彩票获得相同奖励
+- **真实彩票系统**: 符合传统彩票逻辑，支持中途交易增加可玩性
+- **时间控制**: 项目有截止时间，过期不能购买
+- **状态管理**: 清晰的项目状态（进行中/已结算/已取消）
 
 ## 项目运行截图
 
